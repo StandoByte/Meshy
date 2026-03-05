@@ -1,5 +1,5 @@
 (function() {
-    const pluginInfo = {"name":"Meshy","id":"meshy","version":"1.0.4","repository":"https://github.com/Shadowkitten47/Meshy"};
+    const pluginInfo = {"name":"Meshy (+Gecko)","id":"meshy","version":"1.0.4","repository":"https://github.com/Shadowkitten47/Meshy"};
     
     const pluginSettings = [
         {
@@ -7,94 +7,111 @@
             name: 'Normalize Mesh UVs',
             description: 'Normalize UVs of polymeshes',
             category: 'export',
-            value: true,
+            value: false,
             plugin: pluginInfo.id,
         },
         {
             id: 'meshy_skip_mesh_normals',
             name: 'Skip Mesh Normals',
-            description: 'Skips normal claculation on polymeshes',
+            description: 'Skips normal calculation on polymeshes',
             category: 'export',
-            value: false,
+            value: true,
             plugin: pluginInfo.id,
         },
         {
             //Force disable single texture on bedrock formats having more than one texture with meshes is pretty useful
             id: 'meshy_force_textures',
             name: 'Force Multi-Textures',
-            description: 'Forces bedrock formats to use allow more than one texture ( You will need to stitch the textures )',
+            description: 'Forces bedrock formats to allow more than one texture ( You will need to stitch the textures )',
             category: 'edit',
-            value: false,
+            value: true,
             plugin: pluginInfo.id,
             onChange: (value) => {
-                Formats['bedrock'].single_texture = !value;
-                Formats['bedrock_old'].single_texture = !value;
+                for (let name of formats) {
+                    let format = Formats[name];
+                    if (format) {
+                        format.single_texture = !value;
+                    }
+                }
             },
-        },
+        }
     ];
     
     //Function names for events to remove
     const listOfFunctions = [ meshyOnParseEvent.name, meshyOnCompileEvent.name, meshyOnBedrockCompileEvent.name];
+
+    let formats = ['bedrock_old', 'bedrock', 'geckolib_model'];
+    const codecs = ['bedrock_old', 'bedrock']; // Gecko plugin uses the bedrock codec
     
     Plugin.register(pluginInfo.id, {
         title: pluginInfo.name, //Meshy
         author: 'Shadowkitten47',
         creation_date: '2024-09-28',
         icon: 'diamond',
-        description: 'Enables the use of a meshes in bedrock formats and to export them to Minecraft Bedrock',
+        description: 'Enables the use of meshes in Bedrock formats and to export them to Minecraft Bedrock, as well as GeckoLib Animated Model format.',
         variant: 'both',
         version: pluginInfo.version, //1.0.4
-        tags: ['Minecraft: Bedrock Edition', 'Entity Models', 'Mesh'],
+        tags: ['Minecraft: Bedrock Edition', 'Minecraft: Java Edition', 'Entity Models', 'Mesh'],
         has_changelog: true,
         min_version: '4.10.4',
         repository: pluginInfo.repository, //Link
         onload() {
-            let bedrock_old = Formats['bedrock_old'];
-            let bedrock = Formats['bedrock'];
-            bedrock.meshes = true;
-            bedrock_old.meshes = true;
             for (let s of pluginSettings) {
                 if (!settings[s.id]) {
                     new Setting(s.id, s);
                 }
             }
-            bedrock.single_texture = !settings['meshy_force_textures']?.value;
-            bedrock_old.single_texture = !settings['meshy_force_textures']?.value;
-    
-            let codec = Codecs['bedrock'];
-            purgeEvents(codec); //Removes all of events that match the function names used so that duplicates don't occur
-    
-            codec.on('parsed', meshyOnParseEvent);
-            codec.on('compile', meshyOnBedrockCompileEvent);
-    
-            codec = Codecs['bedrock_old'];
-            purgeEvents(codec);
-    
-            codec.on('parsed', meshyOnParseEvent);
-            codec.on('compile', meshyOnCompileEvent);
+            
+            applyToFormats(formats);
             //pivot_tool = Toolbars["tools"].children.find((t) => t.id == 'pivot_tool').condition = () => { return false; };
 
         },
         onunload() {
-            let bedrock_old = Formats['bedrock_old'];
-            let bedrock = Formats['bedrock'];
-            bedrock.meshes = false;
-            bedrock_old.meshes = false;
-            bedrock.single_texture = true;
-            bedrock_old.single_texture = true;
             for (let s of pluginSettings) {
                 if (settings[s.id]) {
                     settings[s.id].delete();
                 }
             }
-            let codec = Codecs['bedrock'];
-            purgeEvents(codec);
-            codec = Codecs['bedrock_old'];
-            purgeEvents(codec);
             
-
+            unapply();
         },
     });
+    
+    function unapply() {
+        for (let name of formats) {
+            let format = Formats[name];
+            if (format) {
+                format.meshes = false;
+                format.single_texture = true;
+            }
+        }
+        for (let name of codecs) {
+            let codec = Codecs[name];
+            if (codec) {
+                purgeEvents(codec);
+            }
+        }
+    }
+    
+    function applyToFormats(formats) {
+        unapply();
+        
+        let single_texture = !settings['meshy_force_textures']?.value;
+        for (let name of formats) {
+            let format = Formats[name];
+            if (format) {
+                format.meshes = true;
+                format.single_texture = single_texture;
+            }
+        }
+        for (let name of codecs) {
+            let codec = Codecs[name];
+            if (codec) {
+                codec.on('parsed', meshyOnParseEvent);
+                codec.on('compile', name === 'bedrock_old' ? meshyOnCompileEvent : meshyOnBedrockCompileEvent); // Extra step for non-legacy bedrock (get the model geometry under "minecraft:geometry" key)
+            }
+        }
+    }
     
     //Beaware: Function zone below
     function meshyOnCompileEvent({model, options}) {
