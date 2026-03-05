@@ -61,7 +61,7 @@
             bedrock.single_texture = !settings['meshy_force_textures']?.value;
             bedrock_old.single_texture = !settings['meshy_force_textures']?.value;
     
-            var codec = Codecs['bedrock'];
+            let codec = Codecs['bedrock'];
             purgeEvents(codec); //Removes all of events that match the function names used so that duplicates don't occur
     
             codec.on('parsed', meshyOnParseEvent);
@@ -87,7 +87,7 @@
                     settings[s.id].delete();
                 }
             }
-            var codec = Codecs['bedrock'];
+            let codec = Codecs['bedrock'];
             purgeEvents(codec);
             codec = Codecs['bedrock_old'];
             purgeEvents(codec);
@@ -98,8 +98,8 @@
     
     //Beaware: Function zone below
     function meshyOnCompileEvent({model, options}) {
-        var groups = getAllGroups();
-        var loose_elements = [];
+        let groups = getAllGroups();
+        let loose_elements = [];
         Outliner.root.forEach((obj) => {
             if (obj instanceof OutlinerElement) {
                 loose_elements.push(obj);
@@ -182,12 +182,13 @@
         const postionMap = new Map();
         const normalMap = new Map();
         const uvMap = new Map();
-        const vertexFacesMap = new Map();
+        
     
         //normal arr -> value
         const normals = new Map();
     
         //Make a map of faces a vertex is appart of 
+        const vertexFacesMap = new Map();
         for (let faceKey in mesh.faces) {
             let face = mesh.faces[faceKey];
             for (let vertexKey of face.vertices) {
@@ -212,7 +213,8 @@
             else normalMap.set(key, normals.get(normal.toString()))
         }
     
-        
+        normals.clear();
+
         let polys = Object.values(mesh.faces).map((face) => {
             const poly = face.getSortedVertices().map((vertexKey) => {
                 const uv = uvOnSave(...face.uv[vertexKey]);
@@ -249,9 +251,9 @@
     
                     if ( !uniquePoints.has(point[0])) {
                         uniquePoints.add(point[0]);
-                        let postion = polyMesh.positions[point[0]]
-                        postion[0] *= -1;
-                        mesh.vertices[`v${point[0]}`] = postion;
+                        let position = [...polyMesh.positions[point[0]]]
+                        position[0] *= -1;
+                        mesh.vertices[`v${point[0]}`] = position;
                     }
 
                     vertices.push(`v${point[0]}`);
@@ -325,9 +327,6 @@
         ];
     }
     
-    function multiplyScalar(vec, scalar) {
-        return vec.map((coord) => coord * scalar);
-    }
     
     function rotatePoint(point, center, rotation) {
         // Convert rotation angles to radians
