@@ -57,6 +57,7 @@
         has_changelog: true,
         min_version: '4.10.4',
         repository: pluginInfo.repository, //Link
+		await_loading: true,
         onload() {
             for (let s of pluginSettings) {
                 if (!settings[s.id]) {
