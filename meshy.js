@@ -164,7 +164,7 @@
             const bone = model.bones.find((b) => b.name === g.name);
             let poly_mesh = null;
             for (var obj of g.children) {
-                if (obj instanceof Mesh) {
+                if (obj instanceof Mesh && obj.export) {
                     poly_mesh = compileMesh(poly_mesh, obj);
                 }
             }
