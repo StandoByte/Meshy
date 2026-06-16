@@ -40,8 +40,10 @@
     //Function names for events to remove
     const listOfFunctions = [ meshyOnParseEvent.name, meshyOnCompileEvent.name, meshyOnBedrockCompileEvent.name];
 
-    let formats = ['bedrock_old', 'bedrock', 'geckolib_model'];
+    let formats = ['bedrock_old', 'bedrock']; // 'geckolib_model' format is added on load
     const codecs = ['bedrock_old', 'bedrock']; // Gecko plugin uses the bedrock codec
+    const GECKO_FORMAT_ID = 'geckolib_model';
+    let formatsAppliedTo = [];
     
     Plugin.register(pluginInfo.id, {
         title: pluginInfo.name, //Meshy
@@ -61,6 +63,18 @@
                     new Setting(s.id, s);
                 }
             }
+
+            if (Formats[GECKO_FORMAT_ID]) { // gecko plugin has loaded already, or this plugin is being reloaded
+                formats.push(GECKO_FORMAT_ID);
+            }
+            else {
+                Blockbench.addListener('construct_format', e => {
+                    if (e.format.id === GECKO_FORMAT_ID) {
+                        formats.push(e.format.id);
+                        applyToFormat(e.format);
+                    }
+                });
+            }
             
             applyToFormats(formats);
             //pivot_tool = Toolbars["tools"].children.find((t) => t.id == 'pivot_tool').condition = () => { return false; };
@@ -78,13 +92,14 @@
     });
     
     function unapply() {
-        for (let name of formats) {
+        for (let name of formatsAppliedTo) {
             let format = Formats[name];
             if (format) {
                 format.meshes = false;
                 format.single_texture = true;
             }
         }
+        formatsAppliedTo.length = 0;
         for (let name of codecs) {
             let codec = Codecs[name];
             if (codec) {
@@ -94,23 +109,33 @@
     }
     
     function applyToFormats(formats) {
-        unapply();
-        
-        let single_texture = !settings['meshy_force_textures']?.value;
         for (let name of formats) {
             let format = Formats[name];
             if (format) {
-                format.meshes = true;
-                format.single_texture = single_texture;
+                applyToFormat(format);
             }
         }
         for (let name of codecs) {
             let codec = Codecs[name];
             if (codec) {
-                codec.on('parsed', meshyOnParseEvent);
-                codec.on('compile', name === 'bedrock_old' ? meshyOnCompileEvent : meshyOnBedrockCompileEvent); // Extra step for non-legacy bedrock (get the model geometry under "minecraft:geometry" key)
+                applyToCodec(codec);
             }
         }
+    }
+
+    function applyToFormat(format) {
+        if (formatsAppliedTo.includes(format.id)) {
+            return;
+        }
+        format.meshes = true;
+        format.single_texture = !settings['meshy_force_textures']?.value;
+        formatsAppliedTo.push(format.id);
+    }
+
+    function applyToCodec(codec) {
+        purgeEvents(codec);
+        codec.on('parsed', meshyOnParseEvent);
+        codec.on('compile', name === 'bedrock_old' ? meshyOnCompileEvent : meshyOnBedrockCompileEvent); // Extra step for non-legacy bedrock (get the model geometry under "minecraft:geometry" key)
     }
     
     //Beaware: Function zone below
